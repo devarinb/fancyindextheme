@@ -10,17 +10,26 @@
         <span class="fancyui-footer-dot"></span>
         <span>FancyIndex Theme</span>
     </div>
-    <div class="fancyui-card-footer-right" id="fancyui-timestamp">
-        <!-- Will be populated by JS -->
-    </div>
+    <div class="fancyui-card-footer-right" id="fancyui-timestamp"></div>
 </div>
 </div>
+
+<!-- Pagination Container -->
+<div class="fancyui-pagination" id="fancyui-pagination"></div>
 
 </div>
 
 <script>
     (function () {
         'use strict';
+
+        // =========================================================================
+        // Configuration
+        // =========================================================================
+        const ITEMS_PER_PAGE = 100;
+        const THEME_STORAGE_KEY = 'fancyindex-theme';
+        const SORT_STORAGE_KEY = 'fancyindex-sort';
+        const SORT_DIR_STORAGE_KEY = 'fancyindex-sort-dir';
 
         // =========================================================================
         // Initialize Lucide Icons
@@ -30,25 +39,84 @@
         }
 
         // =========================================================================
-        // Theme Toggle
+        // Theme Toggle (Auto/Light/Dark)
         // =========================================================================
         const themeToggle = document.getElementById('fancyui-theme-toggle');
+        const themeOptions = ['auto', 'light', 'dark'];
+        let currentThemeIndex = 0;
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+
+        function getStoredTheme() {
+            try {
+                return localStorage.getItem(THEME_STORAGE_KEY) || 'auto';
+            } catch (e) {
+                return 'auto';
+            }
+        }
+
+        function storeTheme(theme) {
+            try {
+                localStorage.setItem(THEME_STORAGE_KEY, theme);
+            } catch (e) { }
+        }
+
+        function applyTheme(theme) {
+            let actualTheme;
+            if (theme === 'auto') {
+                actualTheme = mediaQuery.matches ? 'dark' : 'light';
+            } else {
+                actualTheme = theme;
+            }
+
+            document.documentElement.classList.remove('dark');
+            if (actualTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            }
+        }
+
+        function updateThemeButton() {
+            if (!themeToggle) return;
+            const theme = themeOptions[currentThemeIndex];
+            // Update icons visibility based on theme
+            const sunIcon = themeToggle.querySelector('.icon-sun');
+            const moonIcon = themeToggle.querySelector('.icon-moon');
+
+            if (theme === 'auto') {
+                // Show both icons dimmed or use auto icon
+                themeToggle.title = 'Theme: Auto (click to change)';
+            } else if (theme === 'light') {
+                themeToggle.title = 'Theme: Light (click to change)';
+            } else {
+                themeToggle.title = 'Theme: Dark (click to change)';
+            }
+        }
+
+        function handleSystemThemeChange() {
+            if (themeOptions[currentThemeIndex] === 'auto') {
+                applyTheme('auto');
+            }
+        }
+
+        // Initialize theme
+        const storedTheme = getStoredTheme();
+        currentThemeIndex = themeOptions.indexOf(storedTheme);
+        if (currentThemeIndex === -1) currentThemeIndex = 0;
+        applyTheme(storedTheme);
+        updateThemeButton();
+        mediaQuery.addEventListener('change', handleSystemThemeChange);
 
         if (themeToggle) {
             themeToggle.addEventListener('click', () => {
-                const html = document.documentElement;
-                if (html.classList.contains('dark')) {
-                    html.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                } else {
-                    html.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                }
+                currentThemeIndex = (currentThemeIndex + 1) % 3;
+                const theme = themeOptions[currentThemeIndex];
+                storeTheme(theme);
+                applyTheme(theme);
+                updateThemeButton();
             });
         }
 
         // =========================================================================
-        // Breadcrumb Generation
+        // Breadcrumb Generation with Copy URL Button
         // =========================================================================
         function generateBreadcrumb() {
             const h1 = document.querySelector('h1');
@@ -61,7 +129,6 @@
             const parts = rawPath.split('/').filter(p => p);
             breadcrumbContainer.innerHTML = '';
 
-            // Root link
             const rootLink = document.createElement('a');
             rootLink.href = '/';
             rootLink.textContent = 'root';
@@ -70,7 +137,6 @@
             let currentPath = '/';
 
             parts.forEach((part, index) => {
-                // Separator
                 const sep = document.createElement('span');
                 sep.className = 'fancyui-breadcrumb-sep';
                 sep.textContent = '/';
@@ -79,13 +145,11 @@
                 currentPath += part + '/';
 
                 if (index === parts.length - 1) {
-                    // Current directory (no link)
                     const current = document.createElement('span');
                     current.className = 'fancyui-breadcrumb-current';
                     current.textContent = part;
                     breadcrumbContainer.appendChild(current);
                 } else {
-                    // Link
                     const link = document.createElement('a');
                     link.href = currentPath;
                     link.className = 'fancyui-breadcrumb-inactive';
@@ -93,6 +157,42 @@
                     breadcrumbContainer.appendChild(link);
                 }
             });
+
+            // Add Copy URL button
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'fancyui-copy-url-btn';
+            copyBtn.innerHTML = '<i data-lucide="copy"></i>';
+            copyBtn.title = 'Copy URL';
+            copyBtn.type = 'button';
+
+            copyBtn.addEventListener('click', async () => {
+                const url = window.location.href;
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(url);
+                    } else {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = url;
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                    }
+                    copyBtn.innerHTML = '<i data-lucide="check"></i>';
+                    copyBtn.classList.add('copied');
+                    if (typeof lucide !== 'undefined') lucide.createIcons();
+                    setTimeout(() => {
+                        copyBtn.innerHTML = '<i data-lucide="copy"></i>';
+                        copyBtn.classList.remove('copied');
+                        if (typeof lucide !== 'undefined') lucide.createIcons();
+                    }, 2000);
+                } catch (err) {
+                    console.error('Copy failed:', err);
+                }
+            });
+
+            breadcrumbContainer.appendChild(copyBtn);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         generateBreadcrumb();
@@ -110,28 +210,19 @@
         // File Icons Enhancement
         // =========================================================================
         const iconMap = {
-            // Folders
             'folder': 'folder',
-            // Images
             'jpg': 'image', 'jpeg': 'image', 'png': 'image', 'gif': 'image', 'svg': 'image', 'webp': 'image', 'ico': 'image', 'bmp': 'image',
-            // Videos
             'mp4': 'video', 'mkv': 'video', 'avi': 'video', 'mov': 'video', 'webm': 'video', 'wmv': 'video',
-            // Audio
             'mp3': 'music', 'wav': 'music', 'ogg': 'music', 'flac': 'music', 'aac': 'music', 'm4a': 'music',
-            // Archives
             'zip': 'archive', 'rar': 'archive', '7z': 'archive', 'tar': 'archive', 'gz': 'archive', 'bz2': 'archive',
-            // Code
             'js': 'file-code', 'ts': 'file-code', 'py': 'file-code', 'rb': 'file-code', 'go': 'file-code', 'rs': 'file-code',
             'java': 'file-code', 'c': 'file-code', 'cpp': 'file-code', 'h': 'file-code', 'css': 'file-code', 'scss': 'file-code',
             'html': 'file-code', 'xml': 'file-code', 'json': 'file-code', 'yaml': 'file-code', 'yml': 'file-code',
             'sh': 'file-code', 'bash': 'file-code', 'php': 'file-code', 'sql': 'file-code',
-            // Documents
             'pdf': 'file-text', 'doc': 'file-text', 'docx': 'file-text', 'txt': 'file-text', 'rtf': 'file-text', 'odt': 'file-text',
             'xls': 'file-spreadsheet', 'xlsx': 'file-spreadsheet', 'csv': 'file-spreadsheet',
             'ppt': 'file-text', 'pptx': 'file-text', 'md': 'file-text', 'markdown': 'file-text',
-            // Executables
             'exe': 'cog', 'msi': 'cog', 'deb': 'package', 'rpm': 'package', 'dmg': 'package', 'app': 'app-window',
-            // Disk images
             'iso': 'disc', 'img': 'disc',
         };
 
@@ -156,14 +247,12 @@
                 const href = link.getAttribute('href') || '';
                 const text = link.textContent.trim();
 
-                // Check if already has icon
                 if (link.querySelector('i, svg, .fancyui-icon')) return;
 
                 let iconName = 'file';
                 let colorClass = 'fancyui-icon-file';
 
                 if (href === '../' || href === '..') {
-                    // Parent directory - special styling
                     const iconWrapper = document.createElement('div');
                     iconWrapper.className = 'fancyui-icon-parent';
                     iconWrapper.innerHTML = '<i data-lucide="arrow-up-left"></i>';
@@ -171,7 +260,6 @@
                     link.style.fontWeight = '600';
                     link.style.color = 'var(--color-accent)';
                 } else if (href.endsWith('/')) {
-                    // Directory
                     iconName = 'folder';
                     colorClass = 'fancyui-icon-folder';
                     const icon = document.createElement('i');
@@ -179,7 +267,6 @@
                     icon.className = `fancyui-icon ${colorClass}`;
                     link.insertBefore(icon, link.firstChild);
                 } else {
-                    // File - get extension
                     const ext = text.split('.').pop().toLowerCase();
                     if (iconMap[ext]) {
                         iconName = iconMap[ext];
@@ -192,7 +279,6 @@
                 }
             });
 
-            // Re-initialize Lucide icons for newly added elements
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
@@ -201,144 +287,265 @@
         addFileIcons();
 
         // =========================================================================
-        // Search Functionality
+        // Table & Pagination Setup
         // =========================================================================
         const searchInput = document.getElementById('fancyui-search');
+        const sortButtons = document.querySelectorAll('.fancyui-sort-btn');
+        const paginationContainer = document.getElementById('fancyui-pagination');
         const table = document.querySelector('table');
 
-        if (searchInput && table) {
-            const tbody = table.querySelector('tbody') || table;
-            const allRows = Array.from(tbody.querySelectorAll('tr'));
+        if (!table) return;
 
-            // Separate parent row
-            let parentRow = null;
-            const fileRows = allRows.filter(row => {
-                const link = row.querySelector('a');
-                const href = link ? link.getAttribute('href') : '';
-                if (href === '../' || href === '..') {
-                    parentRow = row;
-                    return false;
+        const tbody = table.querySelector('tbody') || table;
+        const allRows = Array.from(tbody.querySelectorAll('tr'));
+
+        // Separate parent row
+        let parentRow = null;
+        const fileRows = allRows.filter(row => {
+            const link = row.querySelector('a');
+            const href = link ? link.getAttribute('href') : '';
+            if (href === '../' || href === '..') {
+                parentRow = row;
+                return false;
+            }
+            return true;
+        });
+
+        let filteredRows = [...fileRows];
+        let currentPage = 1;
+
+        // =========================================================================
+        // Pagination
+        // =========================================================================
+        function renderPagination() {
+            if (!paginationContainer) return;
+
+            const totalPages = Math.ceil(filteredRows.length / ITEMS_PER_PAGE);
+            paginationContainer.innerHTML = '';
+
+            if (totalPages <= 1) return;
+
+            // Info
+            const info = document.createElement('span');
+            info.className = 'fancyui-pagination-info';
+            const start = (currentPage - 1) * ITEMS_PER_PAGE + 1;
+            const end = Math.min(currentPage * ITEMS_PER_PAGE, filteredRows.length);
+            info.textContent = `${start}-${end} of ${filteredRows.length}`;
+            paginationContainer.appendChild(info);
+
+            const buttonsDiv = document.createElement('div');
+            buttonsDiv.className = 'fancyui-pagination-buttons';
+
+            // Prev
+            const prevBtn = document.createElement('button');
+            prevBtn.innerHTML = '<i data-lucide="chevron-left"></i>';
+            prevBtn.className = 'fancyui-pagination-btn';
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderPage();
                 }
-                return true;
             });
+            buttonsDiv.appendChild(prevBtn);
 
-            searchInput.addEventListener('input', (e) => {
-                const query = e.target.value.toLowerCase().trim();
+            // Page numbers
+            const maxButtons = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+            let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+            if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+            }
 
-                fileRows.forEach(row => {
-                    const link = row.querySelector('a');
-                    const text = link ? link.textContent.toLowerCase() : '';
-                    row.classList.toggle('hidden', query && !text.includes(query));
+            for (let i = startPage; i <= endPage; i++) {
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                btn.className = 'fancyui-pagination-btn';
+                if (i === currentPage) btn.classList.add('active');
+                btn.addEventListener('click', () => {
+                    currentPage = i;
+                    renderPage();
                 });
+                buttonsDiv.appendChild(btn);
+            }
+
+            // Next
+            const nextBtn = document.createElement('button');
+            nextBtn.innerHTML = '<i data-lucide="chevron-right"></i>';
+            nextBtn.className = 'fancyui-pagination-btn';
+            nextBtn.disabled = currentPage === totalPages;
+            nextBtn.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderPage();
+                }
+            });
+            buttonsDiv.appendChild(nextBtn);
+
+            paginationContainer.appendChild(buttonsDiv);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function renderPage() {
+            // Hide all
+            fileRows.forEach(row => row.style.display = 'none');
+
+            // Show current page items
+            const start = (currentPage - 1) * ITEMS_PER_PAGE;
+            const end = start + ITEMS_PER_PAGE;
+            const pageItems = filteredRows.slice(start, end);
+
+            pageItems.forEach(row => {
+                if (!row.classList.contains('hidden')) {
+                    row.style.display = '';
+                }
             });
 
-            // Keyboard shortcuts
-            document.addEventListener('keydown', (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-                    e.preventDefault();
-                    searchInput.focus();
-                    searchInput.select();
-                }
-                if (e.key === 'Escape' && document.activeElement === searchInput) {
-                    searchInput.value = '';
-                    searchInput.dispatchEvent(new Event('input'));
-                    searchInput.blur();
-                }
+            renderPagination();
+        }
+
+        // =========================================================================
+        // Search with Debouncing
+        // =========================================================================
+        let searchTimeout;
+
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    const query = e.target.value.toLowerCase().trim();
+
+                    if (!query) {
+                        filteredRows = [...fileRows];
+                        fileRows.forEach(row => row.classList.remove('hidden'));
+                    } else {
+                        filteredRows = fileRows.filter(row => {
+                            const link = row.querySelector('a');
+                            const text = link ? link.textContent.toLowerCase() : '';
+                            const matches = text.includes(query);
+                            row.classList.toggle('hidden', !matches);
+                            return matches;
+                        });
+                    }
+
+                    currentPage = 1;
+                    renderPage();
+                }, 150);
             });
         }
 
         // =========================================================================
         // Sort Functionality
         // =========================================================================
-        const sortButtons = document.querySelectorAll('.fancyui-sort-btn');
+        let currentSort = localStorage.getItem(SORT_STORAGE_KEY) || 'name';
+        let sortDir = parseInt(localStorage.getItem(SORT_DIR_STORAGE_KEY) || '1');
 
-        if (sortButtons.length && table) {
-            const tbody = table.querySelector('tbody') || table;
-            const allRows = Array.from(tbody.querySelectorAll('tr'));
-
-            // Separate parent row
-            let parentRow = null;
-            const fileRows = allRows.filter(row => {
-                const link = row.querySelector('a');
-                const href = link ? link.getAttribute('href') : '';
-                if (href === '../' || href === '..') {
-                    parentRow = row;
-                    return false;
-                }
-                return true;
-            });
-
-            let currentSort = localStorage.getItem('fancyui-sort') || 'name';
-            let sortDir = parseInt(localStorage.getItem('fancyui-sort-dir') || '1');
-
-            function parseSize(str) {
-                if (!str || str === '-' || str === '--') return -1;
-                const match = str.trim().match(/^([\d.]+)\s*([KMGT]?B?)?$/i);
-                if (!match) return 0;
-                const val = parseFloat(match[1]);
-                const unit = (match[2] || 'B').toUpperCase();
-                const units = { 'B': 1, 'K': 1024, 'KB': 1024, 'M': 1048576, 'MB': 1048576, 'G': 1073741824, 'GB': 1073741824, 'T': 1099511627776, 'TB': 1099511627776 };
-                return val * (units[unit] || 1);
-            }
-
-            function parseDate(str) {
-                if (!str || str === '-') return 0;
-                return new Date(str).getTime() || 0;
-            }
-
-            function getRowData(row) {
-                const cells = row.querySelectorAll('td');
-                const link = row.querySelector('a');
-                return {
-                    name: link ? link.textContent.toLowerCase() : '',
-                    isDir: link && link.getAttribute('href').endsWith('/'),
-                    date: cells[1] ? parseDate(cells[1].textContent) : 0,
-                    size: cells[2] ? parseSize(cells[2].textContent) : 0,
-                    el: row
-                };
-            }
-
-            function doSort(sortBy, toggle = true) {
-                if (toggle) {
-                    if (currentSort === sortBy) {
-                        sortDir *= -1;
-                    } else {
-                        currentSort = sortBy;
-                        sortDir = 1;
-                    }
-                }
-
-                localStorage.setItem('fancyui-sort', currentSort);
-                localStorage.setItem('fancyui-sort-dir', sortDir.toString());
-
-                sortButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.sort === currentSort));
-
-                const data = fileRows.map(getRowData);
-
-                data.sort((a, b) => {
-                    // Dirs first
-                    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
-
-                    let cmp = 0;
-                    if (currentSort === 'name') cmp = a.name.localeCompare(b.name);
-                    else if (currentSort === 'date') cmp = a.date - b.date;
-                    else if (currentSort === 'size') cmp = a.size - b.size;
-
-                    return cmp * sortDir;
-                });
-
-                // Re-append
-                if (parentRow) tbody.appendChild(parentRow);
-                data.forEach(d => tbody.appendChild(d.el));
-            }
-
-            sortButtons.forEach(btn => {
-                btn.addEventListener('click', () => doSort(btn.dataset.sort));
-            });
-
-            // Apply initial sort
-            doSort(currentSort, false);
+        function parseSize(str) {
+            if (!str || str === '-' || str === '--') return -1;
+            const match = str.trim().match(/^([\d.]+)\s*([KMGT]?i?B?)?$/i);
+            if (!match) return 0;
+            const val = parseFloat(match[1]);
+            const unit = (match[2] || 'B').toUpperCase().replace('I', '');
+            const units = { 'B': 1, 'K': 1024, 'KB': 1024, 'M': 1048576, 'MB': 1048576, 'G': 1073741824, 'GB': 1073741824, 'T': 1099511627776, 'TB': 1099511627776 };
+            return val * (units[unit] || 1);
         }
+
+        function parseDate(str) {
+            if (!str || str === '-') return 0;
+            return new Date(str).getTime() || 0;
+        }
+
+        function getRowData(row) {
+            const cells = row.querySelectorAll('td');
+            const link = row.querySelector('a');
+            return {
+                name: link ? link.textContent.toLowerCase() : '',
+                isDir: link && link.getAttribute('href').endsWith('/'),
+                date: cells[1] ? parseDate(cells[1].textContent) : 0,
+                size: cells[2] ? parseSize(cells[2].textContent) : 0,
+                el: row
+            };
+        }
+
+        function doSort(sortBy, toggle = true) {
+            if (toggle) {
+                if (currentSort === sortBy) {
+                    sortDir *= -1;
+                } else {
+                    currentSort = sortBy;
+                    sortDir = 1;
+                }
+            }
+
+            localStorage.setItem(SORT_STORAGE_KEY, currentSort);
+            localStorage.setItem(SORT_DIR_STORAGE_KEY, sortDir.toString());
+
+            sortButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.sort === currentSort));
+
+            const data = fileRows.map(getRowData);
+
+            data.sort((a, b) => {
+                if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+
+                let cmp = 0;
+                if (currentSort === 'name') cmp = a.name.localeCompare(b.name);
+                else if (currentSort === 'date') cmp = a.date - b.date;
+                else if (currentSort === 'size') cmp = a.size - b.size;
+
+                return cmp * sortDir;
+            });
+
+            // Re-append
+            if (parentRow) tbody.appendChild(parentRow);
+            data.forEach(d => tbody.appendChild(d.el));
+
+            // Update filtered list order
+            filteredRows = data.filter(d => !d.el.classList.contains('hidden')).map(d => d.el);
+            renderPage();
+        }
+
+        sortButtons.forEach(btn => {
+            btn.addEventListener('click', () => doSort(btn.dataset.sort));
+        });
+
+        // =========================================================================
+        // Keyboard Shortcuts
+        // =========================================================================
+        document.addEventListener('keydown', (e) => {
+            const activeEl = document.activeElement;
+            const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+
+            // '/' or Ctrl+K or Ctrl+F - Focus search
+            if ((e.key === '/' || ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'f'))) && !isTyping) {
+                e.preventDefault();
+                if (searchInput) {
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                return;
+            }
+
+            // Escape - Clear search
+            if (e.key === 'Escape' && activeEl === searchInput) {
+                e.preventDefault();
+                searchInput.value = '';
+                searchInput.dispatchEvent(new Event('input'));
+                searchInput.blur();
+                return;
+            }
+
+            // 't' - Toggle theme
+            if (e.key === 't' && !isTyping) {
+                e.preventDefault();
+                if (themeToggle) themeToggle.click();
+                return;
+            }
+        });
+
+        // =========================================================================
+        // Initial Sort & Render
+        // =========================================================================
+        doSort(currentSort, false);
 
     })();
 </script>
