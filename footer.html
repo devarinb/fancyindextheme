@@ -1,0 +1,347 @@
+</div>
+
+<!-- Card Footer -->
+<div class="fancyui-card-footer">
+    <div class="fancyui-card-footer-left">
+        <span>
+            <i data-lucide="cpu"></i>
+            Powered by Nginx
+        </span>
+        <span class="fancyui-footer-dot"></span>
+        <span>FancyIndex Theme</span>
+    </div>
+    <div class="fancyui-card-footer-right" id="fancyui-timestamp">
+        <!-- Will be populated by JS -->
+    </div>
+</div>
+</div>
+
+</div>
+
+<script>
+    (function () {
+        'use strict';
+
+        // =========================================================================
+        // Initialize Lucide Icons
+        // =========================================================================
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+
+        // =========================================================================
+        // Theme Toggle
+        // =========================================================================
+        const themeToggle = document.getElementById('fancyui-theme-toggle');
+
+        if (themeToggle) {
+            themeToggle.addEventListener('click', () => {
+                const html = document.documentElement;
+                if (html.classList.contains('dark')) {
+                    html.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    html.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                }
+            });
+        }
+
+        // =========================================================================
+        // Breadcrumb Generation
+        // =========================================================================
+        function generateBreadcrumb() {
+            const h1 = document.querySelector('h1');
+            const breadcrumbContainer = document.getElementById('fancyui-breadcrumb');
+            if (!h1 || !breadcrumbContainer) return;
+
+            const rawPath = h1.textContent.trim();
+            document.title = `Index of ${rawPath}`;
+
+            const parts = rawPath.split('/').filter(p => p);
+            breadcrumbContainer.innerHTML = '';
+
+            // Root link
+            const rootLink = document.createElement('a');
+            rootLink.href = '/';
+            rootLink.textContent = 'root';
+            breadcrumbContainer.appendChild(rootLink);
+
+            let currentPath = '/';
+
+            parts.forEach((part, index) => {
+                // Separator
+                const sep = document.createElement('span');
+                sep.className = 'fancyui-breadcrumb-sep';
+                sep.textContent = '/';
+                breadcrumbContainer.appendChild(sep);
+
+                currentPath += part + '/';
+
+                if (index === parts.length - 1) {
+                    // Current directory (no link)
+                    const current = document.createElement('span');
+                    current.className = 'fancyui-breadcrumb-current';
+                    current.textContent = part;
+                    breadcrumbContainer.appendChild(current);
+                } else {
+                    // Link
+                    const link = document.createElement('a');
+                    link.href = currentPath;
+                    link.className = 'fancyui-breadcrumb-inactive';
+                    link.textContent = part;
+                    breadcrumbContainer.appendChild(link);
+                }
+            });
+        }
+
+        generateBreadcrumb();
+
+        // =========================================================================
+        // Timestamp
+        // =========================================================================
+        const timestampEl = document.getElementById('fancyui-timestamp');
+        if (timestampEl) {
+            const now = new Date();
+            timestampEl.textContent = `Generated: ${now.toISOString().slice(0, 19).replace('T', ' ')}`;
+        }
+
+        // =========================================================================
+        // File Icons Enhancement
+        // =========================================================================
+        const iconMap = {
+            // Folders
+            'folder': 'folder',
+            // Images
+            'jpg': 'image', 'jpeg': 'image', 'png': 'image', 'gif': 'image', 'svg': 'image', 'webp': 'image', 'ico': 'image', 'bmp': 'image',
+            // Videos
+            'mp4': 'video', 'mkv': 'video', 'avi': 'video', 'mov': 'video', 'webm': 'video', 'wmv': 'video',
+            // Audio
+            'mp3': 'music', 'wav': 'music', 'ogg': 'music', 'flac': 'music', 'aac': 'music', 'm4a': 'music',
+            // Archives
+            'zip': 'archive', 'rar': 'archive', '7z': 'archive', 'tar': 'archive', 'gz': 'archive', 'bz2': 'archive',
+            // Code
+            'js': 'file-code', 'ts': 'file-code', 'py': 'file-code', 'rb': 'file-code', 'go': 'file-code', 'rs': 'file-code',
+            'java': 'file-code', 'c': 'file-code', 'cpp': 'file-code', 'h': 'file-code', 'css': 'file-code', 'scss': 'file-code',
+            'html': 'file-code', 'xml': 'file-code', 'json': 'file-code', 'yaml': 'file-code', 'yml': 'file-code',
+            'sh': 'file-code', 'bash': 'file-code', 'php': 'file-code', 'sql': 'file-code',
+            // Documents
+            'pdf': 'file-text', 'doc': 'file-text', 'docx': 'file-text', 'txt': 'file-text', 'rtf': 'file-text', 'odt': 'file-text',
+            'xls': 'file-spreadsheet', 'xlsx': 'file-spreadsheet', 'csv': 'file-spreadsheet',
+            'ppt': 'file-text', 'pptx': 'file-text', 'md': 'file-text', 'markdown': 'file-text',
+            // Executables
+            'exe': 'cog', 'msi': 'cog', 'deb': 'package', 'rpm': 'package', 'dmg': 'package', 'app': 'app-window',
+            // Disk images
+            'iso': 'disc', 'img': 'disc',
+        };
+
+        const iconColorMap = {
+            'folder': 'fancyui-icon-folder',
+            'image': 'fancyui-icon-image',
+            'video': 'fancyui-icon-video',
+            'music': 'fancyui-icon-audio',
+            'archive': 'fancyui-icon-archive',
+            'file-code': 'fancyui-icon-code',
+            'file-text': 'fancyui-icon-document',
+            'file-spreadsheet': 'fancyui-icon-document',
+        };
+
+        function addFileIcons() {
+            const rows = document.querySelectorAll('tbody tr, table tr:not(:first-child)');
+
+            rows.forEach(row => {
+                const link = row.querySelector('td:first-child a, td a');
+                if (!link) return;
+
+                const href = link.getAttribute('href') || '';
+                const text = link.textContent.trim();
+
+                // Check if already has icon
+                if (link.querySelector('i, svg, .fancyui-icon')) return;
+
+                let iconName = 'file';
+                let colorClass = 'fancyui-icon-file';
+
+                if (href === '../' || href === '..') {
+                    // Parent directory - special styling
+                    const iconWrapper = document.createElement('div');
+                    iconWrapper.className = 'fancyui-icon-parent';
+                    iconWrapper.innerHTML = '<i data-lucide="arrow-up-left"></i>';
+                    link.insertBefore(iconWrapper, link.firstChild);
+                    link.style.fontWeight = '600';
+                    link.style.color = 'var(--color-accent)';
+                } else if (href.endsWith('/')) {
+                    // Directory
+                    iconName = 'folder';
+                    colorClass = 'fancyui-icon-folder';
+                    const icon = document.createElement('i');
+                    icon.setAttribute('data-lucide', iconName);
+                    icon.className = `fancyui-icon ${colorClass}`;
+                    link.insertBefore(icon, link.firstChild);
+                } else {
+                    // File - get extension
+                    const ext = text.split('.').pop().toLowerCase();
+                    if (iconMap[ext]) {
+                        iconName = iconMap[ext];
+                        colorClass = iconColorMap[iconName] || 'fancyui-icon-file';
+                    }
+                    const icon = document.createElement('i');
+                    icon.setAttribute('data-lucide', iconName);
+                    icon.className = `fancyui-icon ${colorClass}`;
+                    link.insertBefore(icon, link.firstChild);
+                }
+            });
+
+            // Re-initialize Lucide icons for newly added elements
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+
+        addFileIcons();
+
+        // =========================================================================
+        // Search Functionality
+        // =========================================================================
+        const searchInput = document.getElementById('fancyui-search');
+        const table = document.querySelector('table');
+
+        if (searchInput && table) {
+            const tbody = table.querySelector('tbody') || table;
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+
+            // Separate parent row
+            let parentRow = null;
+            const fileRows = allRows.filter(row => {
+                const link = row.querySelector('a');
+                const href = link ? link.getAttribute('href') : '';
+                if (href === '../' || href === '..') {
+                    parentRow = row;
+                    return false;
+                }
+                return true;
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase().trim();
+
+                fileRows.forEach(row => {
+                    const link = row.querySelector('a');
+                    const text = link ? link.textContent.toLowerCase() : '';
+                    row.classList.toggle('hidden', query && !text.includes(query));
+                });
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                    e.preventDefault();
+                    searchInput.focus();
+                    searchInput.select();
+                }
+                if (e.key === 'Escape' && document.activeElement === searchInput) {
+                    searchInput.value = '';
+                    searchInput.dispatchEvent(new Event('input'));
+                    searchInput.blur();
+                }
+            });
+        }
+
+        // =========================================================================
+        // Sort Functionality
+        // =========================================================================
+        const sortButtons = document.querySelectorAll('.fancyui-sort-btn');
+
+        if (sortButtons.length && table) {
+            const tbody = table.querySelector('tbody') || table;
+            const allRows = Array.from(tbody.querySelectorAll('tr'));
+
+            // Separate parent row
+            let parentRow = null;
+            const fileRows = allRows.filter(row => {
+                const link = row.querySelector('a');
+                const href = link ? link.getAttribute('href') : '';
+                if (href === '../' || href === '..') {
+                    parentRow = row;
+                    return false;
+                }
+                return true;
+            });
+
+            let currentSort = localStorage.getItem('fancyui-sort') || 'name';
+            let sortDir = parseInt(localStorage.getItem('fancyui-sort-dir') || '1');
+
+            function parseSize(str) {
+                if (!str || str === '-' || str === '--') return -1;
+                const match = str.trim().match(/^([\d.]+)\s*([KMGT]?B?)?$/i);
+                if (!match) return 0;
+                const val = parseFloat(match[1]);
+                const unit = (match[2] || 'B').toUpperCase();
+                const units = { 'B': 1, 'K': 1024, 'KB': 1024, 'M': 1048576, 'MB': 1048576, 'G': 1073741824, 'GB': 1073741824, 'T': 1099511627776, 'TB': 1099511627776 };
+                return val * (units[unit] || 1);
+            }
+
+            function parseDate(str) {
+                if (!str || str === '-') return 0;
+                return new Date(str).getTime() || 0;
+            }
+
+            function getRowData(row) {
+                const cells = row.querySelectorAll('td');
+                const link = row.querySelector('a');
+                return {
+                    name: link ? link.textContent.toLowerCase() : '',
+                    isDir: link && link.getAttribute('href').endsWith('/'),
+                    date: cells[1] ? parseDate(cells[1].textContent) : 0,
+                    size: cells[2] ? parseSize(cells[2].textContent) : 0,
+                    el: row
+                };
+            }
+
+            function doSort(sortBy, toggle = true) {
+                if (toggle) {
+                    if (currentSort === sortBy) {
+                        sortDir *= -1;
+                    } else {
+                        currentSort = sortBy;
+                        sortDir = 1;
+                    }
+                }
+
+                localStorage.setItem('fancyui-sort', currentSort);
+                localStorage.setItem('fancyui-sort-dir', sortDir.toString());
+
+                sortButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.sort === currentSort));
+
+                const data = fileRows.map(getRowData);
+
+                data.sort((a, b) => {
+                    // Dirs first
+                    if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+
+                    let cmp = 0;
+                    if (currentSort === 'name') cmp = a.name.localeCompare(b.name);
+                    else if (currentSort === 'date') cmp = a.date - b.date;
+                    else if (currentSort === 'size') cmp = a.size - b.size;
+
+                    return cmp * sortDir;
+                });
+
+                // Re-append
+                if (parentRow) tbody.appendChild(parentRow);
+                data.forEach(d => tbody.appendChild(d.el));
+            }
+
+            sortButtons.forEach(btn => {
+                btn.addEventListener('click', () => doSort(btn.dataset.sort));
+            });
+
+            // Apply initial sort
+            doSort(currentSort, false);
+        }
+
+    })();
+</script>
+</body>
+
+</html>
